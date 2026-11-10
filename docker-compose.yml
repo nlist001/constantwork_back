@@ -1,0 +1,106 @@
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.10.7-management
+    container_name: rabbitmq-3.10.7
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: 1
+    ports:
+      - "5672:5672"   # Порт AMQP (для кода)
+      - "15672:15672" # Порт веб-интерфейса управления
+    volumes:
+      # Сохранение данных (очереди, пользователи, настройки)
+      - ./rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend
+
+  # База данных
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1
+      POSTGRES_DB: constantwork
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  gateway:
+    ports:
+      - "3000:3000"
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: gateway # Тот самый ARG из Dockerfile
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - RMQ_URL=amqp://admin:1@rabbitmq:5672
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - rabbitmq
+      - redis
+    networks:
+      - backend
+      - frontend
+
+  todo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: todo
+    environment:
+      - NODE_ENV=production
+      - DB_PORT=5432
+      - DB_NAME=constantwork
+      - DB_HOST=postgres
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=1
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - backend
+  
+  ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: ai
+    environment:
+      - NODE_ENV=production
+      - OPENAI_API_KEY=*
+      - OPENAI_API_URL=*
+    depends_on:
+      - rabbitmq
+    networks:
+      - backend
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+
+volumes:
+  pgdata:

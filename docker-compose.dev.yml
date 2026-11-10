@@ -1,0 +1,27 @@
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.10.7-management
+    container_name: rabbitmq-3.10.7
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: 1
+    ports:
+      - "5672:5672"   # Порт AMQP (для кода)
+      - "15672:15672" # Порт веб-интерфейса управления
+    volumes:
+      # Сохранение данных (очереди, пользователи, настройки)
+      - ./rabbitmq_data:/var/lib/rabbitmq
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
